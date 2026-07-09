@@ -1211,13 +1211,20 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
       <h2 class="sec-title">Found a crack? File the report.</h2>
       <p class="sec-lede">A confirmed kill needs four things: what you typed, what Javelin said, what actually happened, and what you expected. Fill them in and hit send — the report goes straight to the Javelin team, and a confirmed kill is credited to you in the next release notes.</p>
       <div class="report-grid">
-        <form class="rform" id="killForm">
+        <!-- Posts the classic way into a hidden iframe (no fetch → no CORS to
+             block it). FormSubmit reads the named fields and emails them. -->
+        <form class="rform" id="killForm" action="https://formsubmit.co/aduamankwahkwasi292@gmail.com" method="POST" target="reportSink">
+          <input type="hidden" name="_subject" id="fSubject" value="[ATTACK-AGENTS] field report">
+          <input type="hidden" name="_template" value="table">
+          <input type="hidden" name="_captcha" value="false">
+          <input type="hidden" name="Full report" id="fFull" value="">
+          <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
           <div class="row2">
             <label>Agent name / alias
-              <input type="text" id="fAgent" placeholder="e.g. K. Mensah" autocomplete="name">
+              <input type="text" id="fAgent" name="Agent" placeholder="e.g. K. Mensah" autocomplete="name">
             </label>
             <label>Division
-              <select id="fDivision">
+              <select id="fDivision" name="Division">
                 <option>Legal</option><option>Medical</option><option>Faculty</option>
                 <option>Research</option><option>Office Ops</option><option>Students</option>
                 <option>Free Company</option>
@@ -1225,7 +1232,7 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
             </label>
           </div>
           <label>Severity
-            <select id="fSeverity">
+            <select id="fSeverity" name="Severity">
               <option value="CRITICAL">CRITICAL — silent failure: said “done”, document is wrong</option>
               <option value="MAJOR" selected>MAJOR — crash, freeze, or a clear command misread</option>
               <option value="MINOR">MINOR — cosmetic, wording, or slow rendering</option>
@@ -1237,19 +1244,20 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
             <span class="sk"><span class="pill min">MINOR</span> Cosmetic or UI issues, awkward messages, sluggishness.</span>
           </div>
           <label>The exact command you typed
-            <textarea id="fCommand" placeholder='replace all "Contractor" with "Consultant"'></textarea>
+            <textarea id="fCommand" name="Command issued" placeholder='replace all "Contractor" with "Consultant"'></textarea>
           </label>
           <label>What Javelin said
-            <textarea id="fSaid" placeholder="Replaced 4 occurrences of “Contractor” with “Consultant”."></textarea>
+            <textarea id="fSaid" name="Javelin said" placeholder="Replaced 4 occurrences of “Contractor” with “Consultant”."></textarea>
           </label>
           <label>What actually happened
-            <textarea id="fActual" placeholder="The occurrence inside the table was skipped."></textarea>
+            <textarea id="fActual" name="What actually happened" placeholder="The occurrence inside the table was skipped."></textarea>
           </label>
           <label>What you expected
-            <textarea id="fExpected" placeholder="All 5 occurrences replaced, including in the table."></textarea>
+            <textarea id="fExpected" name="Expected" placeholder="All 5 occurrences replaced, including in the table."></textarea>
           </label>
           <button class="btn btn-red" type="submit">⚑&nbsp; Send field report</button>
         </form>
+        <iframe name="reportSink" id="reportSink" title="report delivery" style="display:none" aria-hidden="true"></iframe>
         <div class="rout" aria-live="polite">
           <div class="rh">Field report</div>
           <div class="report-status" id="reportStatus" hidden></div>
@@ -4233,8 +4241,21 @@ window.JavelinEngine = __require("index");
   const val = (id) => document.getElementById(id).value.trim();
   function setStatus(kind, html) { statusEl.hidden = false; statusEl.className = 'report-status ' + kind; statusEl.innerHTML = html; }
 
-  killForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  // A load in the hidden iframe after a submit means FormSubmit received the
+  // POST and responded — the real "it went through" signal (we can't read the
+  // cross-origin body, but the round-trip completing is enough).
+  let sendPending = false, sendTimer = null;
+  const sink = document.getElementById('reportSink');
+  if (sink) sink.addEventListener('load', () => {
+    if (!sendPending) return; // ignore the initial blank load
+    sendPending = false;
+    clearTimeout(sendTimer);
+    setStatus('ok', '✓ Report sent to the Javelin team. Thank you, Agent — a confirmed kill is credited to you.');
+    submitBtn.textContent = '✓ Sent — file another';
+    submitBtn.disabled = false;
+  });
+
+  killForm.addEventListener('submit', (e) => {
     const sev = val('fSeverity').split(' ')[0];
     const agent = val('fAgent') || '(anonymous)';
     const division = val('fDivision');
@@ -4266,41 +4287,29 @@ window.JavelinEngine = __require("index");
       + '?subject=' + encodeURIComponent('[ATTACK-AGENTS] ' + sev + ' — field report')
       + '&body=' + encodeURIComponent(report);
 
+    // Need at least something actionable before we send.
     if (!val('fCommand') && !val('fActual')) {
+      e.preventDefault();
       setStatus('err', 'Add at least the command you typed, or what actually happened, then send.');
       return;
     }
 
+    // Fill the fields FormSubmit emails: a dynamic subject and the full
+    // formatted report (the visible fields are named and post themselves).
+    document.getElementById('fSubject').value = '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : '');
+    document.getElementById('fFull').value = report;
+
+    // Do NOT preventDefault: let the form POST into the hidden iframe.
     setStatus('working', '◷ Sending your report…');
     submitBtn.disabled = true;
-    try {
-      const res = await fetch('https://formsubmit.co/ajax/' + REPORT_INBOX, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          _subject: '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : ''),
-          _template: 'table',
-          _captcha: 'false',
-          Agent: agent,
-          Division: division,
-          Severity: sev,
-          Build: 'web attack range · engine v0.6.4',
-          'Command issued': val('fCommand') || '(none given)',
-          'Javelin said': val('fSaid') || '(not recorded)',
-          'What actually happened': val('fActual') || '(not described)',
-          Expected: val('fExpected') || '(not described)',
-          'Full report': report,
-        }),
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      await res.json().catch(() => ({}));
-      setStatus('ok', '✓ Report sent to the Javelin team. Thank you, Agent — a confirmed kill is credited to you.');
-      submitBtn.textContent = '✓ Sent — file another';
-    } catch (_err) {
-      setStatus('err', 'Couldn’t send automatically from here. Your report is ready in the panel — hit <b>Copy report</b> or <b>Send by email instead</b>.');
-    } finally {
+    sendPending = true;
+    clearTimeout(sendTimer);
+    sendTimer = setTimeout(() => {
+      if (!sendPending) return;
+      sendPending = false;
+      setStatus('err', 'Couldn’t reach the mail service — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
       submitBtn.disabled = false;
-    }
+    }, 12000);
   });
   btnCopy.addEventListener('click', async () => {
     try {
