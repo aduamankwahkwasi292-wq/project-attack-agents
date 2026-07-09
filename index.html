@@ -1211,14 +1211,7 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
       <h2 class="sec-title">Found a crack? File the report.</h2>
       <p class="sec-lede">A confirmed kill needs four things: what you typed, what Javelin said, what actually happened, and what you expected. Fill them in and hit send — the report goes straight to the Javelin team, and a confirmed kill is credited to you in the next release notes.</p>
       <div class="report-grid">
-        <!-- Posts the classic way into a hidden iframe (no fetch → no CORS to
-             block it). FormSubmit reads the named fields and emails them. -->
-        <form class="rform" id="killForm" action="https://formsubmit.co/aduamankwahkwasi292@gmail.com" method="POST" target="reportSink">
-          <input type="hidden" name="_subject" id="fSubject" value="[ATTACK-AGENTS] field report">
-          <input type="hidden" name="_template" value="table">
-          <input type="hidden" name="_captcha" value="false">
-          <input type="hidden" name="Full report" id="fFull" value="">
-          <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <form class="rform" id="killForm">
           <div class="row2">
             <label>Agent name / alias
               <input type="text" id="fAgent" name="Agent" placeholder="e.g. K. Mensah" autocomplete="name">
@@ -1257,7 +1250,6 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
           </label>
           <button class="btn btn-red" type="submit">⚑&nbsp; Send field report</button>
         </form>
-        <iframe name="reportSink" id="reportSink" title="report delivery" style="display:none" aria-hidden="true"></iframe>
         <div class="rout" aria-live="polite">
           <div class="rh">Field report</div>
           <div class="report-status" id="reportStatus" hidden></div>
@@ -4241,44 +4233,14 @@ window.JavelinEngine = __require("index");
   const val = (id) => document.getElementById(id).value.trim();
   function setStatus(kind, html) { statusEl.hidden = false; statusEl.className = 'report-status ' + kind; statusEl.innerHTML = html; }
 
-  // Delivery detection. The POST navigates a hidden iframe to FormSubmit; we
-  // can't read the cross-origin response, but the iframe BECOMING cross-origin
-  // is proof the round-trip happened. Each submission gets a fresh same-origin
-  // sink so the transition is unambiguous, and a poll detects it even when the
-  // iframe's load event is flaky for cross-origin POST responses.
-  let sendWatch = null;
-  function freshSink() {
-    const old = document.getElementById('reportSink');
-    if (old) old.remove();
-    const f = document.createElement('iframe');
-    f.id = 'reportSink';
-    f.name = 'reportSink';
-    f.title = 'report delivery';
-    f.style.display = 'none';
-    f.setAttribute('aria-hidden', 'true');
-    document.getElementById('report').appendChild(f);
-    return f;
-  }
-  function watchDelivery(sinkEl) {
-    const started = Date.now();
-    clearInterval(sendWatch);
-    sendWatch = setInterval(() => {
-      let crossed = false;
-      try { void sinkEl.contentDocument.body; } catch (_e) { crossed = true; }
-      if (crossed) {
-        clearInterval(sendWatch);
-        setStatus('ok', '✓ Report handed to the mail service — thank you, Agent. A confirmed kill is credited to you in the release notes.');
-        submitBtn.textContent = '✓ Sent — file another';
-        submitBtn.disabled = false;
-      } else if (Date.now() - started > 45000) {
-        clearInterval(sendWatch);
-        setStatus('err', 'Couldn’t reach the mail service — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
-        submitBtn.disabled = false;
-      }
-    }, 600);
-  }
+  // Delivery: Web3Forms (proper CORS + a readable JSON verdict, so "sent"
+  // means the service actually accepted the message — the previous relay
+  // acknowledged posts but never delivered).
+  const WEB3FORMS_KEY = '';
+  const esc = (s) => String(s).replace(/[<>&]/g, '');
 
-  killForm.addEventListener('submit', (e) => {
+  killForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
     const sev = val('fSeverity').split(' ')[0];
     const agent = val('fAgent') || '(anonymous)';
     const division = val('fDivision');
@@ -4312,22 +4274,46 @@ window.JavelinEngine = __require("index");
 
     // Need at least something actionable before we send.
     if (!val('fCommand') && !val('fActual')) {
-      e.preventDefault();
       setStatus('err', 'Add at least the command you typed, or what actually happened, then send.');
       return;
     }
 
-    // Fill the fields FormSubmit emails: a dynamic subject and the full
-    // formatted report (the visible fields are named and post themselves).
-    document.getElementById('fSubject').value = '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : '');
-    document.getElementById('fFull').value = report;
+    if (!WEB3FORMS_KEY || WEB3FORMS_KEY.indexOf('%') !== -1) {
+      setStatus('err', 'Automatic delivery is offline right now — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
+      return;
+    }
 
-    // Do NOT preventDefault: the form POSTs into a fresh hidden iframe (the
-    // browser resolves target="reportSink" by name when the submit lands).
-    const sinkEl = freshSink();
     setStatus('working', '◷ Sending your report…');
     submitBtn.disabled = true;
-    watchDelivery(sinkEl);
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : ''),
+          from_name: 'Project Attack-Agents',
+          botcheck: '',
+          Agent: agent,
+          Division: division,
+          Severity: sev,
+          Build: 'web attack range · engine v0.6.4',
+          'Command issued': val('fCommand') || '(none given)',
+          'Javelin said': val('fSaid') || '(not recorded)',
+          'What actually happened': val('fActual') || '(not described)',
+          Expected: val('fExpected') || '(not described)',
+          'Full report': report,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!j || j.success !== true) throw new Error((j && j.message) || ('HTTP ' + res.status));
+      setStatus('ok', '✓ Report sent to the Javelin team — thank you, Agent. A confirmed kill is credited to you in the release notes.');
+      submitBtn.textContent = '✓ Sent — file another';
+    } catch (err) {
+      setStatus('err', 'Couldn’t send automatically (' + esc(err && err.message ? err.message : 'network error') + ') — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
   btnCopy.addEventListener('click', async () => {
     try {
