@@ -971,7 +971,7 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
           <span class="rl"><span class="lamp" id="rangeLamp"></span> <span id="rangeState">Range cold — press Arm</span></span>
           <button class="btn btn-ghost sm" id="btnReset" disabled>↺ Reset document</button>
           <button class="btn btn-ghost sm" id="btnFullscreen" disabled>⛶ Fullscreen</button>
-          <a class="btn btn-blue sm" href="#report">Report a finding →</a>
+          <a class="btn btn-blue sm" id="btnReport" href="#report">Report a finding →</a>
         </div>
         <div class="range-stage" id="rangeStage">
           <div class="range-cover" id="rangeCover">
@@ -1400,6 +1400,32 @@ const APP_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\
   }
   btnFs.addEventListener('click', () => setMax(!maxed));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && maxed) setMax(false); });
+
+  // "Report a finding" lives in the maximized toolbar. While maximized the page
+  // behind is covered and its scroll is locked, so a bare #report jump goes
+  // nowhere — leave the range first, then scroll to the form once layout (and
+  // any native-fullscreen exit) has settled.
+  const btnReport = document.getElementById('btnReport');
+  btnReport.addEventListener('click', (e) => {
+    if (!maxed) return; // normal anchor jump when not maximized
+    e.preventDefault();
+    const target = document.getElementById('report');
+    const wasNativeFs = !!document.fullscreenElement;
+    setMax(false);
+    const goToReport = () => target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (wasNativeFs) {
+      // exitFullscreen is async; scroll after it completes, with a fallback.
+      let done = false;
+      const run = () => { if (done) return; done = true; goToReport(); };
+      document.addEventListener('fullscreenchange', function once() {
+        document.removeEventListener('fullscreenchange', once);
+        setTimeout(run, 40);
+      });
+      setTimeout(run, 350);
+    } else {
+      requestAnimationFrame(goToReport);
+    }
+  });
 
   /* ---- field report builder ---- */
   const out = document.getElementById('reportOut');
