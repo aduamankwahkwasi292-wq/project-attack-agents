@@ -849,6 +849,13 @@ footer.site {
 }
 footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; }
 
+/* ---- report send status ---- */
+.report-status { font-family: var(--mono); font-size: 13px; line-height: 1.5; padding: 10px 14px; border-radius: 6px; margin: 12px 18px 0; }
+.report-status.working { color: var(--mut); border: 1px solid var(--line); }
+.report-status.ok { color: var(--green); border: 1px solid var(--green); background: rgba(70, 181, 103, 0.08); }
+.report-status.err { color: var(--amber); border: 1px solid var(--amber); background: rgba(217, 161, 60, 0.08); }
+.report-status b { color: inherit; }
+
 /* ---- speed ---- */
 .speed-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 34px; }
 .stile { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-2); padding: 22px; }
@@ -1202,7 +1209,7 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
     <div class="wrap">
       <p class="file-tag">File 07 · Report a Kill</p>
       <h2 class="sec-title">Found a crack? File the report.</h2>
-      <p class="sec-lede">A confirmed kill needs four things: what you typed, what Javelin said, what actually happened, and what you expected. The form builds a clean field report — send it in and the kill is credited to you in the next release notes.</p>
+      <p class="sec-lede">A confirmed kill needs four things: what you typed, what Javelin said, what actually happened, and what you expected. Fill them in and hit send — the report goes straight to the Javelin team, and a confirmed kill is credited to you in the next release notes.</p>
       <div class="report-grid">
         <form class="rform" id="killForm">
           <div class="row2">
@@ -1241,15 +1248,15 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
           <label>What you expected
             <textarea id="fExpected" placeholder="All 5 occurrences replaced, including in the table."></textarea>
           </label>
-          <button class="btn btn-red" type="submit">⚑&nbsp; Build the field report</button>
+          <button class="btn btn-red" type="submit">⚑&nbsp; Send field report</button>
         </form>
         <div class="rout" aria-live="polite">
-          <div class="rh">Field report — preview</div>
-          <pre id="reportOut">Fill the form and press “Build the field report”.
-The report appears here, ready to copy or send.</pre>
+          <div class="rh">Field report</div>
+          <div class="report-status" id="reportStatus" hidden></div>
+          <pre id="reportOut">Fill in the form and press “Send field report”. It goes straight to the Javelin team, and a copy appears here.</pre>
           <div class="racts">
             <button class="btn btn-ghost sm" id="btnCopyReport" disabled>⧉ Copy report</button>
-            <a class="btn btn-blue sm" id="btnMailReport" href="#" aria-disabled="true">✉ Send by email</a>
+            <a class="btn btn-ghost sm" id="btnMailReport" href="#" aria-disabled="true">✉ Send by email instead</a>
           </div>
         </div>
       </div>
@@ -4213,19 +4220,29 @@ window.JavelinEngine = __require("index");
     }
   });
 
-  /* ---- field report builder ---- */
+  /* ---- field report: build it, then send it to the team's inbox ----
+     Posts to FormSubmit (no backend of our own needed); the whole report is
+     also shown and can be copied or emailed if the send ever fails. */
+  const REPORT_INBOX = 'aduamankwahkwasi292@gmail.com';
   const out = document.getElementById('reportOut');
   const btnCopy = document.getElementById('btnCopyReport');
   const btnMail = document.getElementById('btnMailReport');
+  const statusEl = document.getElementById('reportStatus');
+  const killForm = document.getElementById('killForm');
+  const submitBtn = killForm.querySelector('button[type="submit"]');
   const val = (id) => document.getElementById(id).value.trim();
-  document.getElementById('killForm').addEventListener('submit', (e) => {
+  function setStatus(kind, html) { statusEl.hidden = false; statusEl.className = 'report-status ' + kind; statusEl.innerHTML = html; }
+
+  killForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const sev = val('fSeverity').split(' ')[0];
+    const agent = val('fAgent') || '(anonymous)';
+    const division = val('fDivision');
     const report = [
       'ATTACK-AGENT FIELD REPORT',
       '=========================',
-      'Agent    : ' + (val('fAgent') || '(anonymous)'),
-      'Division : ' + val('fDivision'),
+      'Agent    : ' + agent,
+      'Division : ' + division,
       'Severity : ' + sev,
       'Build    : web attack range · engine v0.6.4',
       'Date     : ' + new Date().toISOString().slice(0, 10),
@@ -4245,9 +4262,45 @@ window.JavelinEngine = __require("index");
     out.textContent = report;
     btnCopy.disabled = false;
     btnMail.setAttribute('aria-disabled', 'false');
-    btnMail.href = 'mailto:aduamankwahkwasi292@gmail.com'
+    btnMail.href = 'mailto:' + REPORT_INBOX
       + '?subject=' + encodeURIComponent('[ATTACK-AGENTS] ' + sev + ' — field report')
       + '&body=' + encodeURIComponent(report);
+
+    if (!val('fCommand') && !val('fActual')) {
+      setStatus('err', 'Add at least the command you typed, or what actually happened, then send.');
+      return;
+    }
+
+    setStatus('working', '◷ Sending your report…');
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch('https://formsubmit.co/ajax/' + REPORT_INBOX, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          _subject: '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : ''),
+          _template: 'table',
+          _captcha: 'false',
+          Agent: agent,
+          Division: division,
+          Severity: sev,
+          Build: 'web attack range · engine v0.6.4',
+          'Command issued': val('fCommand') || '(none given)',
+          'Javelin said': val('fSaid') || '(not recorded)',
+          'What actually happened': val('fActual') || '(not described)',
+          Expected: val('fExpected') || '(not described)',
+          'Full report': report,
+        }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await res.json().catch(() => ({}));
+      setStatus('ok', '✓ Report sent to the Javelin team. Thank you, Agent — a confirmed kill is credited to you.');
+      submitBtn.textContent = '✓ Sent — file another';
+    } catch (_err) {
+      setStatus('err', 'Couldn’t send automatically from here. Your report is ready in the panel — hit <b>Copy report</b> or <b>Send by email instead</b>.');
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
   btnCopy.addEventListener('click', async () => {
     try {
