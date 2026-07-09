@@ -4241,19 +4241,42 @@ window.JavelinEngine = __require("index");
   const val = (id) => document.getElementById(id).value.trim();
   function setStatus(kind, html) { statusEl.hidden = false; statusEl.className = 'report-status ' + kind; statusEl.innerHTML = html; }
 
-  // A load in the hidden iframe after a submit means FormSubmit received the
-  // POST and responded — the real "it went through" signal (we can't read the
-  // cross-origin body, but the round-trip completing is enough).
-  let sendPending = false, sendTimer = null;
-  const sink = document.getElementById('reportSink');
-  if (sink) sink.addEventListener('load', () => {
-    if (!sendPending) return; // ignore the initial blank load
-    sendPending = false;
-    clearTimeout(sendTimer);
-    setStatus('ok', '✓ Report sent to the Javelin team. Thank you, Agent — a confirmed kill is credited to you.');
-    submitBtn.textContent = '✓ Sent — file another';
-    submitBtn.disabled = false;
-  });
+  // Delivery detection. The POST navigates a hidden iframe to FormSubmit; we
+  // can't read the cross-origin response, but the iframe BECOMING cross-origin
+  // is proof the round-trip happened. Each submission gets a fresh same-origin
+  // sink so the transition is unambiguous, and a poll detects it even when the
+  // iframe's load event is flaky for cross-origin POST responses.
+  let sendWatch = null;
+  function freshSink() {
+    const old = document.getElementById('reportSink');
+    if (old) old.remove();
+    const f = document.createElement('iframe');
+    f.id = 'reportSink';
+    f.name = 'reportSink';
+    f.title = 'report delivery';
+    f.style.display = 'none';
+    f.setAttribute('aria-hidden', 'true');
+    document.getElementById('report').appendChild(f);
+    return f;
+  }
+  function watchDelivery(sinkEl) {
+    const started = Date.now();
+    clearInterval(sendWatch);
+    sendWatch = setInterval(() => {
+      let crossed = false;
+      try { void sinkEl.contentDocument.body; } catch (_e) { crossed = true; }
+      if (crossed) {
+        clearInterval(sendWatch);
+        setStatus('ok', '✓ Report handed to the mail service — thank you, Agent. A confirmed kill is credited to you in the release notes.');
+        submitBtn.textContent = '✓ Sent — file another';
+        submitBtn.disabled = false;
+      } else if (Date.now() - started > 45000) {
+        clearInterval(sendWatch);
+        setStatus('err', 'Couldn’t reach the mail service — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
+        submitBtn.disabled = false;
+      }
+    }, 600);
+  }
 
   killForm.addEventListener('submit', (e) => {
     const sev = val('fSeverity').split(' ')[0];
@@ -4299,17 +4322,12 @@ window.JavelinEngine = __require("index");
     document.getElementById('fSubject').value = '[ATTACK-AGENTS] ' + sev + ' — ' + division + (agent !== '(anonymous)' ? ' — ' + agent : '');
     document.getElementById('fFull').value = report;
 
-    // Do NOT preventDefault: let the form POST into the hidden iframe.
+    // Do NOT preventDefault: the form POSTs into a fresh hidden iframe (the
+    // browser resolves target="reportSink" by name when the submit lands).
+    const sinkEl = freshSink();
     setStatus('working', '◷ Sending your report…');
     submitBtn.disabled = true;
-    sendPending = true;
-    clearTimeout(sendTimer);
-    sendTimer = setTimeout(() => {
-      if (!sendPending) return;
-      sendPending = false;
-      setStatus('err', 'Couldn’t reach the mail service — your report is ready in the panel; hit <b>Copy report</b> or <b>Send by email instead</b>.');
-      submitBtn.disabled = false;
-    }, 12000);
+    watchDelivery(sinkEl);
   });
   btnCopy.addEventListener('click', async () => {
     try {
