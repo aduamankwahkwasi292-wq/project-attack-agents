@@ -163,6 +163,13 @@ h2.sec-title {
 section.file { padding: 84px 0 30px; scroll-margin-top: 76px; }
 section.file + section.file { border-top: 1px solid var(--line-soft); }
 
+/* ---- freshness strip: scrolls away, not sticky ---- */
+.fresh-bar { background: var(--bg-2); border-bottom: 1px solid var(--line); }
+.fresh-bar .fresh-in { padding: 8px 24px; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--mut); line-height: 1.5; }
+.fresh-bar b { color: var(--blue); font-weight: 600; }
+.fresh-bar kbd { font-family: var(--mono); font-size: 11.5px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+@media (max-width: 640px) { .fresh-bar .fresh-in { font-size: 11px; } }
+
 /* ---- top bar ---- */
 .top {
   position: sticky;
@@ -948,6 +955,12 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
 </style>
 
 <a class="skip" href="#range" style="position:absolute;left:-9999px;">Skip to the Attack Range</a>
+
+<div class="fresh-bar">
+  <div class="wrap fresh-in">
+    🛰 New builds ship fast during Wave 1. Not seeing the latest? Force a fresh copy: <b>press <kbd>Ctrl</kbd>+<kbd>F5</kbd></b> (<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> on Mac).
+  </div>
+</div>
 
 <header class="top">
   <div class="wrap top-in">
