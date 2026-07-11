@@ -980,7 +980,7 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
           <a class="btn btn-ghost" href="#record">Windows installer — in assembly</a>
         </div>
         <div class="stat-strip" role="list" aria-label="Program statistics">
-          <div class="st" role="listitem"><div class="n">185</div><div class="l">automated tests passing</div></div>
+          <div class="st" role="listitem"><div class="n">333</div><div class="l">automated tests passing</div></div>
           <div class="st" role="listitem"><div class="n">30+</div><div class="l">Wave-0 kills confirmed</div></div>
           <div class="st" role="listitem"><div class="n">6</div><div class="l">divisions recruiting</div></div>
           <div class="st" role="listitem"><div class="n">v0.6.4</div><div class="l">engine · runs on-device</div></div>
@@ -1316,11 +1316,11 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
   <section class="file" id="record">
     <div class="wrap">
       <p class="file-tag">File 08 · Campaign Record</p>
-      <h2 class="sec-title">Wave 0 is closed. The scoreboard stands.</h2>
-      <p class="sec-lede">Before recruitment opened, Javelin was attacked internally — Wave 0. These are its honest numbers. Wave 1 is where your name enters the record.</p>
+      <h2 class="sec-title">Wave 0 is closed. Wave 1 is live — and the board already has a name.</h2>
+      <p class="sec-lede">Before recruitment opened, Javelin was attacked internally — Wave 0. These are its honest numbers. Wave 1 is open now, and the first kill is already logged.</p>
       <div class="tiles">
         <div class="tile rv"><div class="n red">30+</div><div class="l">defects found &amp; neutralized in Wave 0</div></div>
-        <div class="tile rv"><div class="n green">185</div><div class="l">automated tests now standing guard</div></div>
+        <div class="tile rv"><div class="n green">333</div><div class="l">automated tests now standing guard</div></div>
         <div class="tile rv"><div class="n blue">100%</div><div class="l">of edits previewed before applying — by architecture</div></div>
         <div class="tile rv"><div class="n">0</div><div class="l">known silent edits remaining · your job: change this to 1</div></div>
       </div>
@@ -1343,10 +1343,21 @@ footer.site .f-in { display: flex; flex-wrap: wrap; gap: 24px; justify-content: 
           </tbody>
         </table>
       </div>
-      <p class="kills-note">Full Wave-0 record ships with the release notes. Wave-1 kills are credited to the reporting agent by name or alias.</p>
+
+      <h3 style="font-family:var(--mono);font-size:12.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--blue);margin:26px 0 14px;">Confirmed kills — Wave 1 (live)</h3>
+      <div class="kills-wrap rv">
+        <table class="kills">
+          <thead><tr><th>ID</th><th>Defect</th><th>Class</th><th>Agent</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>W1-01</td><td>“underline every heading” was understood in full but had no operation to run — an entire heading-formatting family was missing, so a plain request dead-ended</td><td>Coverage</td><td><b style="color:var(--blue)">Senior Agent</b></td><td><span class="st">NEUTRALIZED</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="kills-note"><b style="color:var(--blue)">First blood in Wave 1 — credited to the Senior Agent.</b> Fixed and shipped the same day: bold, italic, underline, highlight and color <i>every heading</i> now work. The kill also earned an upgrade for everyone — every refusal now offers a deterministic <b>“Did you mean?”</b>, turning a dead end into the nearest real command. Wave-1 kills are credited to the reporting agent by name or alias.</p>
 
       <div class="relnotes">
-        <div class="rel rv"><span class="v">v0.6.4 — current</span><span class="d"><b>All text file types</b> open and save with their exact encoding (UTF-8, UTF-16, BOMs) · <b>any-edge image resize</b> · font styles · remove controls for tables and images.</span></div>
+        <div class="rel rv"><span class="v">v0.7.0 — current</span><span class="d"><b>Talk to it in plain English</b> — an offline phrasebook translates natural commands and shows “Understood as:” before anything runs · <b>heading formatting</b> (bold / underline / color every heading) · <b>entity targets</b> (every date, email, phone number, URL) · <b>tidy commands</b> (double spaces, smart quotes, tabs) · a deterministic <b>“Did you mean?”</b> on every refusal · <b>Word (.html) export</b> · <b>333 automated tests</b>. Still zero network code.</span></div>
+        <div class="rel rv"><span class="v">v0.6.4</span><span class="d"><b>All text file types</b> open and save with their exact encoding (UTF-8, UTF-16, BOMs) · <b>any-edge image resize</b> · font styles · remove controls for tables and images.</span></div>
         <div class="rel rv"><span class="v">v0.6.x</span><span class="d"><b>Document-first views</b> (Document / Source / Redline) · live tables editable in place · drag-resize for columns and images · sentence and paragraph anchors for inserts · PDF export to a location you choose.</span></div>
         <div class="rel rv"><span class="v">v0.5.x</span><span class="d"><b>The deterministic core:</b> preview-first edits, refusal on ambiguity, atomic chains, tracked changes with legal redline, compare against a file on disk.</span></div>
       </div>
